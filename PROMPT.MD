@@ -527,3 +527,154 @@ module.exports = {
   }
 };
 ```
+
+---
+
+## 17) Button Framework — `utils/buttonManager.js` (Custom Scripts + Commands)
+
+As of v5.1.0, buttons can trigger THREE kinds of behavior. `utils/gifted-btns.js` (§5) is still exactly how you *send* buttons — `buttonManager` is how you *define what happens* when they're tapped, without hardcoding a new `if` branch into `handler.js` for every button you ever add.
+
+### 17.1 The three button kinds
+
+| Kind | Built with | Click behavior |
+|---|---|---|
+| Command button | `buttonManager.commandButton(label, command)` | Runs an existing bot command, exactly as if the user typed it. |
+| Custom script button | `buttonManager.customButton(label, actionId)` | Runs a function **you** register — send any message, call any API, do anything. |
+| Reply button | `buttonManager.replyButton(label, text)` | Sugar over a custom script that just replies with fixed text. |
+
+### 17.2 Full example (`.check` command — see `commands/utility/check.js`)
+
+```js
+const buttonManager = require('../../utils/buttonManager');
+const { sendInteractiveMessage } = require('../../utils/gifted-btns');
+
+// Register a custom action ONCE at module load time — this can do
+// literally anything, it's not tied to any command.
+buttonManager.registerAction('check_custom_demo', async (sock, msg, extra) => {
+  await extra.reply('You pressed the custom button! Put any logic here.');
+});
+
+module.exports = {
+  name: 'check',
+  category: 'utility',
+  async execute(sock, msg, args, extra) {
+    await sendInteractiveMessage(sock, extra.from, {
+      text: 'Tap a button:',
+      interactiveButtons: [
+        buttonManager.commandButton('👑 Owner', '.owner'),
+        buttonManager.commandButton('💚 Alive', '.alive'),
+        buttonManager.commandButton('🏓 Ping', '.ping'),
+        buttonManager.customButton('✨ Custom Script', 'check_custom_demo')
+      ]
+    }, { quoted: msg });
+  }
+};
+```
+
+### 17.3 How dispatch works
+
+`handler.js` calls `buttonManager.dispatch(sock, msg, extra)` as the very first thing on every incoming button click:
+- `fn_<actionId>` buttons → runs the registered handler, catches errors, replies `❌` on failure, always reports "handled" so nothing double-fires.
+- `cmd_<command>` buttons → intentionally left alone; the existing (unchanged) command-routing layers in `handler.js` / `utils/button.js` still own that path.
+
+### 17.4 Rules
+
+- Register custom actions at **module load time** (top of the file), not inside `execute()` — otherwise you'll re-register (harmlessly, but pointlessly) on every command call.
+- `actionId` must be unique across the whole bot. Prefix it with your command name to avoid collisions (`check_custom_demo`, not `demo`).
+- A custom action handler gets `(sock, msg, extra, meta)` — `extra` has `reply`/`react`/`database`/etc. exactly like a normal command's `execute`.
+- Don't put secrets or user-controllable data directly in the button `id` — WhatsApp round-trips it as plain text.
+
+---
+
+## 18) Channel Automation — `utils/channelManager.js` + `utils/reactionManager.js`
+
+### 18.1 What it is
+
+A **permanent, non-toggleable** system (not a `.autoreact on/off` command — normal users, and even most owners, can't turn this off from chat) that automatically reacts to:
+- new posts in managed newsletter channels
+- every message in managed groups
+- every message from managed users
+
+driven entirely by a **remote JSON file**, never hardcoded in this repo:
+
+```
+https://proboy.vercel.app/bot/ids.json
+```
+
+```json
+[
+  { "id": "120363422946163295@newsletter", "name": "ProBoy MAIN CHANNEL", "number": "923261684315" }
+]
+```
+
+Only `id` matters functionally. `name`/`number` are for humans (`.channelinfo`). `id` can be a `@newsletter`, `@g.us`, or `@s.whatsapp.net`/`@lid` JID — the type is inferred automatically, no separate config needed. Add/remove entries in that JSON any time; the bot picks it up on the next refresh (every 5 minutes, no redeploy).
+
+### 18.2 Files
+
+| File | Job |
+|---|---|
+| `utils/channelManager.js` | Fetches + caches the remote list, classifies entries by type, exposes `getNewsletters()` / `getGroups()` / `getUsers()` / `isManaged(jid)` / `getEntry(jid)`. Refresh is scheduled via `utils/scheduler.js` and is safe to call from multiple sessions (idempotent). |
+| `utils/reactionManager.js` | Owns ALL auto-reacting — both the general `config.autoReact` feature (unchanged behavior, just centralized so it can't double-fire) and the new managed-channel system. Includes per-chat cooldown, message-id de-dup, and a global rate limit so it can never spam or get the bot rate-limited by WhatsApp. |
+
+### 18.3 Safety mechanisms (all in `reactionManager.js`)
+
+- **De-dup**: every reacted message id is remembered (bounded to 5000 entries) — never reacts twice to the same message.
+- **Per-chat cooldown**: 3s between reactions in the same chat, even under a burst of messages.
+- **Global rate limit**: max 15 managed reactions per rolling 10s window across the whole bot.
+- **Never touches `config.autoReact`'s own behavior** — that feature is still controlled exactly however it always was; this file just stopped it from being duplicated between `proboy.js` and `handler.js`.
+
+### 18.4 Commands
+
+- `.channelinfo` — shows the currently loaded managed channels/groups/users and when the list was last refreshed (`commands/utility/channelinfo.js`).
+
+### 18.5 Roadmap (scaffolded, not yet built — build these as focused commands on top of `utils/automationEngine.js` when needed)
+
+`.channelstats`, `.channelwatch`, `.channelforward`, `.targetpost <link> <count>`, `.statuswatch`, `.statusreact`, `.statusinfo`. None of these are implemented yet — don't assume they exist. `utils/automationEngine.js` (§19) is the intended foundation for building them without reinventing event/condition/action plumbing each time.
+
+---
+
+## 19) Automation Engine — `utils/automationEngine.js`
+
+A tiny, generic IF/THEN rule engine — not tied to any one feature.
+
+```js
+const automationEngine = require('../../utils/automationEngine');
+
+automationEngine.registerRule({
+  name: 'notify-owner-on-vip-post',
+  event: 'channelPost',
+  condition: (payload) => payload.channelId === '123@newsletter',
+  action: async (payload, ctx) => {
+    await ctx.sock.sendMessage(ctx.ownerJid, { text: `New post: ${payload.text}` });
+  }
+});
+
+// elsewhere, whenever that kind of thing happens:
+await automationEngine.triggerEvent('channelPost', { channelId, text }, { sock, ownerJid });
+```
+
+No events are emitted by the core bot yet — this is infrastructure for future commands (§18.5) to build on, not a feature with built-in behavior today.
+
+---
+
+## 20) Anti-System Fixes — `utils/antiSystem.js`
+
+Two long-standing bugs were fixed here (v5.1.0):
+
+1. **antilink was never actually invoked.** It was fully implemented but only called from a fire-and-forget spot in `proboy.js`, *after* `handleMessage` had already fully processed the message — and any error was silently swallowed. It's now called synchronously, first, inside `handler.js`'s `handleMessage`, exactly like every other anti-feature (antitag, antiall, antigroupmention).
+2. **anticall read a static `config` value no command could ever change at runtime**, so it was permanently off in practice. It's now a **global** DB setting (calls ring the bot's own number, not a specific group, so a single global toggle is the correct model — not per-group). Toggle with:
+
+```
+.anticall on
+.anticall off
+.anticall status
+```
+(owner-only, `commands/owner/anticall.js`)
+
+If you're debugging either feature, `utils/antiSystem.js` is now the single source of truth — `handler.js`'s `handleAntilink`/`initializeAntiCall` exports are thin backward-compatible wrappers around it, kept only so nothing that referenced them by name breaks.
+
+---
+
+## 21) Logging tags (v5.1.0 additions)
+
+New tagged logger at `utils/logger.js`, used by all the new subsystems: `[CHANNEL]`, `[AUTOREACT]`, `[AUTOMATION]`, `[BUTTON]`, `[ANTILINK]`, `[ANTICALL]`, `[SCHEDULER]`. This does not replace the existing colored boot/connection logger in `proboy.js` — it's specifically for the new subsystems so they don't need to import `proboy.js` internals.
