@@ -1,6 +1,6 @@
 {
-  "name": "ProBoy-MD",
-  "version": "1.0.0",
+  "name": "Evil Imranos Bot",
+  "version": "3.0.0",
   "description": "WhatsApp MD Bot with Baileys",
   "main": "index.js",
   "type": "commonjs",
@@ -8,7 +8,7 @@
     "start": "node index.js",
     "dev": "nodemon index.js"
   },
-  "author": "SHAHAN",
+  "author": "Imrane Moussaid",
   "license": "MIT",
   "dependencies": {
      "@vitalets/google-translate-api": "^9.2.1",
