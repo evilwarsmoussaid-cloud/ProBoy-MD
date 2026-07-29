@@ -1,4 +1,4 @@
-# ProBoy-MD Development Prompt (Production-Aligned)
+# Evil Imranos Bot Development Prompt (Production-Aligned)
 
 Use this as the primary prompt/spec for anyone (human or AI) building or modifying features in this repository.
 This document is aligned with current project behavior in `index.js`, `handler.js`, `config.js`, `database.js`, `commands/*`, and `utils/*`.
@@ -166,7 +166,7 @@ const { sendInteractiveMessage } = require('../../utils/gifted-btns');
 
 await sendInteractiveMessage(sock, from, {
   text: `✅ Your code is:\n\n\`${code}\``,
-  footer: 'ProBoy-MD',
+  footer: 'Evil ImranosBot',
   interactiveButtons: [
     {
       name: 'cta_copy',
