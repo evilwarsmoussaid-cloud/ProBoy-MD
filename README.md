@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="utils/bot_image.jpg" alt="ProBoy-MD" width="220" style="border-radius:20px" />
+<img src="utils/bot_image.jpg" alt="Evil Imranos Bot" width="220" style="border-radius:20px" />
 
-# ProBoy‑MD
+# Evil Imranos Bot
 
 **A fast, lightweight WhatsApp bot built on Baileys — no QR code needed.**
 
