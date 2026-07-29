@@ -5,14 +5,14 @@ const social = require('./settings/social');
 const templates = require('./settings/templates');
 
 module.exports = {
-  ownerNumber: ["923261684315"],
-  ownerName: ["SHahan"],
+  ownerNumber: ["212617503205"],
+  ownerName: ["Evil Imranos"],
   ownerJids: [],
-  sudoNumbers: [],
+  sudoNumbers: [212607361454],
   sudoJids: [],
 
-  botName: "ProBoy-MD",
-  version: "3.0.42",
+  botName: "Evil Imranos Bot",
+  version: "3.0.0",
   prefix: ".",
   sessionName: "session",
   sessionID: process.env.SESSION_ID || '',
@@ -20,8 +20,8 @@ module.exports = {
   cidJsonUrl: "https://proboy.vercel.app/bot/cid.json",
   updateZipUrl: "https://github.com/proboy315/ProBoy-MD/archive/refs/heads/main.zip",
 
-  packname: "ProBoy-MD",
-  author: "SHahan",
+  packname: "Evil Imranos",
+  author: "Imrane Moussaid",
 
   selfMode: false,
   autoRead: false,
