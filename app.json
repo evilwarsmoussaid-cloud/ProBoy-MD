@@ -10,7 +10,7 @@
   ],
   "env": {
     "SESSION_ID": {
-      "description": "ProBoy-MD session string (e.g. ProBoy-MD!<base64_compressed_data>)",
+      "description": "Evil Imranos Pair session string (e.g. Evil-Imranos Bot!<base64_compressed_data>)",
       "required": true,
       "value": ""
     }
